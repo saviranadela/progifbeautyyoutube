@@ -102,5 +102,5 @@ if __name__ == '__main__':
   search_list_by_keyword(client,
     part='snippet',
     maxResults=25,
-    q='surfing',
+    q='NYX Powder Puff Lippie',
     type='')
