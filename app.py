@@ -11,21 +11,76 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 from pprint import pprint
 
-# The CLIENT_SECRETS_FILE variable specifies the name of a file that contains
-# the OAuth 2.0 information for this application, including its client_id and
-# client_secret.
-CLIENT_SECRETS_FILE = "client_secret_738967786673-fcajig6eeh0guikrssr62skia84gscai.apps.googleusercontent.com.json"
+from flask import Flask, redirect, url_for, session, request, jsonify
+from flask_oauthlib.client import OAuth
+
+
+app = Flask(__name__)
 
 # This OAuth 2.0 access scope allows for full read/write access to the
 # authenticated user's account and requires requests to use an SSL connection.
 SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
 API_SERVICE_NAME = 'youtube'
 API_VERSION = 'v3'
+API_KEY = 'AIzaSyC3E5vHzdVs8p7VVwubVUqwjPuo5meTWh8'
 
-def get_authenticated_service():
-  flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE, SCOPES)
-  credentials = flow.run_console()
-  return build(API_SERVICE_NAME, API_VERSION, credentials = credentials)
+app = Flask(__name__)
+app.config['GOOGLE_ID'] = "738967786673-fcajig6eeh0guikrssr62skia84gscai.apps.googleusercontent.com"
+app.config['GOOGLE_SECRET'] = "2L92gYLVXcm_VOAVcRWE4pNO"
+app.debug = True
+app.secret_key = 'development'
+oauth = OAuth(app)
+
+google = oauth.remote_app(
+    'google',
+    consumer_key=app.config.get('GOOGLE_ID'),
+    consumer_secret=app.config.get('GOOGLE_SECRET'),
+    request_token_params={
+        'scope': 'email'
+    },
+    base_url='https://www.googleapis.com/oauth2/v1/',
+    request_token_url=None,
+    access_token_method='POST',
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+)
+
+@app.route('/')
+def index():
+    if 'google_token' in session:
+        me = google.get('userinfo')
+        return jsonify({"data": me.data})
+    return redirect(url_for('login'))
+
+
+@app.route('/login')
+def login():
+    return google.authorize(callback=url_for('authorized', _external=True))
+
+
+@app.route('/logout')
+def logout():
+    session.pop('google_token', None)
+    return redirect(url_for('index'))
+
+
+@app.route('/login/authorized')
+def authorized():
+    resp = google.authorized_response()
+    if resp is None:
+        return 'Access denied: reason=%s error=%s' % (
+            request.args['error_reason'],
+            request.args['error_description']
+        )
+    session['google_token'] = (resp['access_token'], '')
+    me = google.get('userinfo')
+    return '''
+    <div>
+    <h1>Welcome {}, you are in!</h1>
+    <a href="http://127.0.0.1:5000/logout"> Logout </a >
+    </div>
+    '''.format(me.data["given_name"])
+    return "Hello {}".format(me.data["given_name"])
 
 def print_response(response):
   pprint(response)
@@ -90,17 +145,17 @@ def search_list_by_keyword(client, **kwargs):
   
   channellist = {item.get('snippet').get('channelId') : item.get('snippet').get('channelTitle') for item in response['items']}
 
-  return print_response(channellist)
+  return jsonify(channellist)
 
+@app.route('/beautyvloggers/<string:keyword>', methods=['GET'])
+def search_video(keyword):
+  client = build(API_SERVICE_NAME, API_VERSION, developerKey = API_KEY)
+  return search_list_by_keyword(client, part='snippet', maxResults=25, q=keyword, type='')
+
+@google.tokengetter
+def get_google_oauth_token():
+    return session.get('google_token')
 
 if __name__ == '__main__':
-  # When running locally, disable OAuthlib's HTTPs verification. When
-  # running in production *do not* leave this option enabled.
-  os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-  client = get_authenticated_service()
+  app.run()
 
-  search_list_by_keyword(client,
-    part='snippet',
-    maxResults=25,
-    q='NYX Powder Puff Lippie',
-    type='')
