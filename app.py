@@ -55,8 +55,9 @@ def index():
 
 @app.route('/login')
 def login():
+  if 'google_token' not in session:
     return google.authorize(callback=url_for('authorized', _external=True))
-
+  return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():
@@ -162,7 +163,6 @@ def search_list_by_keyword(client, **kwargs):
     channelSubsribers = channels_list_by_id(client, part='snippet,contentDetails,statistics', id= channelId)
 
     if int(channelSubsribers) >= 20000:
-      print(int(channelSubsribers))
       channelList.update({channelId:channelTitle})
 
   return jsonify(channelList)
