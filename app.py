@@ -17,6 +17,11 @@ from flask_oauthlib.client import OAuth
 
 app = Flask(__name__)
 
+# The CLIENT_SECRETS_FILE variable specifies the name of a file that contains
+# the OAuth 2.0 information for this application, including its client_id and
+# client_secret.
+CLIENT_SECRETS_FILE = "client_secret_738967786673-fcajig6eeh0guikrssr62skia84gscai.apps.googleusercontent.com.json"
+
 # This OAuth 2.0 access scope allows for full read/write access to the
 # authenticated user's account and requires requests to use an SSL connection.
 SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
@@ -135,6 +140,16 @@ def remove_empty_kwargs(**kwargs):
         good_kwargs[key] = value
   return good_kwargs
 
+def channels_list_by_id(client, **kwargs):
+  # See full sample for function
+  kwargs = remove_empty_kwargs(**kwargs)
+
+  response = client.channels().list(
+    **kwargs
+  ).execute()
+
+  return response['items'][0].get('statistics').get('subscriberCount')
+
 def search_list_by_keyword(client, **kwargs):
   # See full sample for function
   kwargs = remove_empty_kwargs(**kwargs)
@@ -142,15 +157,26 @@ def search_list_by_keyword(client, **kwargs):
   response = client.search().list(
     **kwargs
   ).execute()
-  
-  channellist = {item.get('snippet').get('channelId') : item.get('snippet').get('channelTitle') for item in response['items']}
 
-  return jsonify(channellist)
+  channelList= {}
+
+  for item in response['items']:
+
+    channelId = item.get('snippet').get('channelId')
+    channelTitle = item.get('snippet').get('channelTitle')
+    channelSubsribers = channels_list_by_id(client, part='snippet,contentDetails,statistics', id= channelId)
+
+    if int(channelSubsribers) >= 20000:
+      print(int(channelSubsribers))
+      channelList.update({channelId:channelTitle})
+
+  return jsonify(channelList)
 
 @app.route('/beautyvloggers/<string:keyword>', methods=['GET'])
 def search_video(keyword):
   client = build(API_SERVICE_NAME, API_VERSION, developerKey = API_KEY)
-  return search_list_by_keyword(client, part='snippet', maxResults=25, q=keyword, type='')
+  return search_list_by_keyword(client, part='snippet', maxResults=50, q=keyword, type='')
+
 
 @google.tokengetter
 def get_google_oauth_token():
@@ -158,4 +184,3 @@ def get_google_oauth_token():
 
 if __name__ == '__main__':
   app.run()
-
