@@ -169,8 +169,10 @@ def search_list_by_keyword(client, **kwargs):
 
 @app.route('/beautyvloggers/<string:keyword>', methods=['GET'])
 def search_video(keyword):
-  client = build(API_SERVICE_NAME, API_VERSION, developerKey = API_KEY)
-  return search_list_by_keyword(client, part='snippet', maxResults=50, q=keyword, type='')
+  if 'google_token' in session:
+    client = build(API_SERVICE_NAME, API_VERSION, developerKey = API_KEY)
+    return search_list_by_keyword(client, part='snippet', maxResults=50, q=keyword, type='')
+  return redirect(url_for('login'))
 
 
 @google.tokengetter
